@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="data:," />
+    <title>Simulação Emergente</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #14170f;
+        --panel: #1f2417;
+        --panel-2: #262c1c;
+        --line: #3c452c;
+        --ink: #eef2df;
+        --muted: #b9c2a2;
+        --gold: #f2c14e;
+        --green: #8bc34a;
+        --btn: #3f6212;
+        --btn-ink: #f4f8e6;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+        -webkit-text-size-adjust: 100%;
+      }
+      .wrap { max-width: 1060px; margin: 0 auto; padding: 10px 12px 28px; }
+
+      /* ---------- Barra de controles ---------- */
+      .controls {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+        background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+        padding: 10px 12px; margin-bottom: 10px;
+      }
+      .tick-badge {
+        font-family: "Baloo 2", "Nunito", sans-serif; font-weight: 800; font-size: 1.05rem;
+        background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+        padding: 6px 12px; white-space: nowrap;
+      }
+      .tick-badge b { color: var(--gold); font-variant-numeric: tabular-nums; }
+      .speed-box { display: flex; align-items: center; gap: 8px; flex: 1 1 220px; min-width: 200px; }
+      .speed-box label { font-weight: 700; font-size: .92rem; white-space: nowrap; }
+      .speed-box output { font-weight: 800; color: var(--gold); min-width: 3.4em; font-variant-numeric: tabular-nums; }
+      input[type="range"] { flex: 1; min-height: 36px; accent-color: var(--green); cursor: pointer; }
+      .btns { display: flex; gap: 8px; }
+      @media (max-width: 620px) {
+        .controls { flex-direction: column; align-items: stretch; }
+        .tick-badge { align-self: flex-start; }
+        .speed-box { flex: none; width: 100%; min-width: 0; }
+        .btns button { flex: 1; }
+      }
+      button {
+        min-height: 44px; min-width: 96px; padding: 10px 18px;
+        font-family: inherit; font-weight: 800; font-size: .95rem;
+        color: var(--btn-ink); background: var(--btn);
+        border: 1px solid #587a1e; border-radius: 8px; cursor: pointer;
+      }
+      button.secondary { background: #4a4436; border-color: #6b6250; }
+      button:active { transform: translateY(1px); }
+
+      /* ---------- Mapa ---------- */
+      .map-frame {
+        border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+        background: #2b6cb0; line-height: 0;
+      }
+      canvas#map { display: block; width: 100%; height: auto; }
+
+      /* ---------- Painéis ---------- */
+      .panels { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px; }
+      @media (min-width: 760px) {
+        .panels { grid-template-columns: 1fr 1fr; }
+        .panels .wide { grid-column: 1 / -1; }
+      }
+      section.panel {
+        background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+        padding: 12px 14px 14px;
+      }
+      section.panel h2 {
+        font-family: "Baloo 2", "Nunito", sans-serif; font-size: 1.12rem; font-weight: 800;
+        margin: 0 0 10px; letter-spacing: .01em;
+      }
+      .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .stat {
+        background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+        padding: 8px 10px;
+      }
+      .stat .num { font-size: 1.35rem; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+      .stat .lbl { font-size: .82rem; color: var(--muted); font-weight: 700; }
+      table.kv { width: 100%; border-collapse: collapse; font-size: .95rem; }
+      table.kv td { padding: 6px 2px; border-bottom: 1px solid #313a24; }
+      table.kv tr:last-child td { border-bottom: none; }
+      table.kv td.v { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+      /* ---------- Legenda ---------- */
+      .legend-items { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .9rem; font-weight: 600; }
+      .legend-items span { display: inline-flex; align-items: center; gap: 6px; padding: 3px 0; }
+      .sw { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(0,0,0,.45); display: inline-block; flex: none; }
+      .sw.round { border-radius: 50%; }
+      .top-groups { margin-top: 10px; font-size: .9rem; }
+      .top-groups .tg-title { font-weight: 800; color: var(--muted); margin-bottom: 4px; }
+      .top-groups div.row { display: flex; align-items: center; gap: 7px; padding: 2px 0; font-weight: 600; }
+
+      /* ---------- Log ---------- */
+      ul#log { list-style: none; margin: 0; padding: 0; font-size: .92rem; }
+      ul#log li { padding: 6px 2px; border-bottom: 1px solid #313a24; line-height: 1.35; }
+      ul#log li:last-child { border-bottom: none; }
+      ul#log .t { color: var(--gold); font-weight: 800; font-variant-numeric: tabular-nums; margin-right: 6px; }
+      .empty { color: var(--muted); font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+
+      <div class="controls" role="group" aria-label="Controles da simulação">
+        <div class="tick-badge">Tick <b id="tickCount">0</b></div>
+        <div class="speed-box">
+          <label for="speed">Velocidade</label>
+          <input type="range" id="speed" min="1" max="60" step="1" value="24" />
+          <output id="speedVal" for="speed">24 t/s</output>
+        </div>
+        <div class="btns">
+          <button id="btnStart" type="button">Iniciar</button>
+          <button id="btnPause" type="button" class="secondary">Pausar</button>
+        </div>
+      </div>
+
+      <div class="map-frame">
+        <canvas id="map" width="960" height="630" aria-label="Mapa do mundo da simulação"></canvas>
+      </div>
+
+      <div class="panels">
+        <section class="panel" aria-labelledby="h-pop">
+          <h2 id="h-pop">População</h2>
+          <div class="stat-grid">
+            <div class="stat"><div class="num" id="stTotal">0</div><div class="lbl">Seres no total</div></div>
+            <div class="stat"><div class="num" id="stLone">0</div><div class="lbl">Sem grupo</div></div>
+            <div class="stat"><div class="num" id="stGroups">0</div><div class="lbl">Grupos formados</div></div>
+            <div class="stat"><div class="num" id="stVillages">0</div><div class="lbl">Aldeias</div></div>
+            <div class="stat"><div class="num" id="stCivs">0</div><div class="lbl">Civilizações emergentes</div></div>
+            <div class="stat"><div class="num" id="stAnimals">0</div><div class="lbl">Animais</div></div>
+            <div class="stat"><div class="num" id="stFood">0</div><div class="lbl">Comida no mapa</div></div>
+            <div class="stat"><div class="num" id="stMountains">0</div><div class="lbl">Montanhas no mapa</div></div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="h-learn">
+          <h2 id="h-learn">O que os seres aprenderam</h2>
+          <table class="kv">
+            <tr><td>Sabe colher plantas</td><td class="v" id="lnPlant">0</td></tr>
+            <tr><td>Sabe achar água</td><td class="v" id="lnWater">0</td></tr>
+            <tr><td>Sabe caçar animais</td><td class="v" id="lnHunt">0</td></tr>
+            <tr><td>Velocidade média</td><td class="v" id="lnSpeed">0</td></tr>
+            <tr><td>Visão média</td><td class="v" id="lnVision">0</td></tr>
+          </table>
+        </section>
+
+        <section class="panel" aria-labelledby="h-legend">
+          <h2 id="h-legend">Legenda</h2>
+          <div class="legend-items">
+            <span><i class="sw" style="background:#5da24a"></i>Grama</span>
+            <span><i class="sw" style="background:#2f6db3"></i>Água</span>
+            <span><i class="sw" style="background:#e3c878"></i>Areia</span>
+            <span><i class="sw" style="background:#2e5d2a"></i>Floresta</span>
+            <span><i class="sw" style="background:#8d8d94"></i>Montanha</span>
+            <span><i class="sw" style="background:#8a6a48"></i>Terra</span>
+            <span><i class="sw round" style="background:#f2c14e"></i>Comida</span>
+            <span><i class="sw round" style="background:#a678e8"></i>Ser</span>
+            <span><i class="sw" style="background:#c98d4b"></i>Aldeia</span>
+            <span><i class="sw" style="background:#d94f3d"></i>Civilização</span>
+          </div>
+          <div class="top-groups" id="topGroups"></div>
+        </section>
+
+        <section class="panel" aria-labelledby="h-log">
+          <h2 id="h-log">O que acontece</h2>
+          <ul id="log"></ul>
+        </section>
+      </div>
+    </div>
+
+    <script>
+    (function () {
+      "use strict";
+
+      /* ================= Mundo ================= */
+      var W = 64, H = 42;               // tiles
+      var T_WATER = 0, T_GRASS = 1, T_SAND = 2, T_FOREST = 3, T_MOUNT = 4, T_EARTH = 5;
+      var terrain = new Uint8Array(W * H);
+      var mountainCount = 0;
+      var landTiles = [];
+
+      function idx(x, y) { return y * W + x; }
+      function inB(x, y) { return x >= 0 && y >= 0 && x < W && y < H; }
+      function tileAt(x, y) {
+        var xi = Math.floor(x), yi = Math.floor(y);
+        if (!inB(xi, yi)) return T_WATER;
+        return terrain[idx(xi, yi)];
+      }
+      function hash2(x, y) {
+        var h = (x * 374761393 + y * 668265263) ^ 0x5bf03635;
+        h = (h ^ (h >> 13)) * 1274126177;
+        return ((h ^ (h >> 16)) >>> 0) / 4294967295;
+      }
+      function blob(cx, cy, r, type) {
+        for (var y = Math.floor(cy - r); y <= cy + r; y++) {
+          for (var x = Math.floor(cx - r); x <= cx + r; x++) {
+            if (!inB(x, y)) continue;
+            var d = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+            if (d < r * (0.65 + hash2(x, y) * 0.5)) terrain[idx(x, y)] = type;
+          }
+        }
+      }
+      function genWorld() {
+        var i, x, y;
+        for (i = 0; i < W * H; i++) terrain[i] = T_GRASS;
+        // manchas de terra
+        for (i = 0; i < 7; i++) blob(4 + Math.random() * (W - 8), 4 + Math.random() * (H - 8), 2 + Math.random() * 3, T_EARTH);
+        // lagos e um rio
+        for (i = 0; i < 5; i++) blob(5 + Math.random() * (W - 10), 5 + Math.random() * (H - 10), 2.5 + Math.random() * 3.5, T_WATER);
+        var rx = Math.random() * W;
+        for (y = 0; y < H; y++) {
+          rx += (Math.random() - 0.5) * 1.6;
+          for (var k = -1; k <= 1; k++) {
+            var xx = Math.round(rx) + k;
+            if (inB(xx, y) && Math.random() < 0.9) terrain[idx(xx, y)] = T_WATER;
+          }
+        }
+        // areia em volta da água
+        var copy = new Uint8Array(terrain);
+        for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
+          if (copy[idx(x, y)] !== T_WATER) continue;
+          var nb = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]];
+          for (i = 0; i < nb.length; i++) {
+            var nx = x + nb[i][0], ny = y + nb[i][1];
+            if (inB(nx, ny) && terrain[idx(nx, ny)] === T_GRASS && hash2(nx, ny) > 0.25) terrain[idx(nx, ny)] = T_SAND;
+          }
+        }
+        // florestas
+        for (i = 0; i < 9; i++) blob(4 + Math.random() * (W - 8), 4 + Math.random() * (H - 8), 2.5 + Math.random() * 3.5, T_FOREST);
+        // montanhas em cadeias
+        for (i = 0; i < 4; i++) {
+          var mx = 5 + Math.random() * (W - 10), my = 5 + Math.random() * (H - 10);
+          for (var s = 0; s < 6; s++) {
+            if (inB(Math.round(mx), Math.round(my)) && terrain[idx(Math.round(mx), Math.round(my))] !== T_WATER)
+              terrain[idx(Math.round(mx), Math.round(my))] = T_MOUNT;
+            mx += (Math.random() - 0.5) * 2.4; my += (Math.random() - 0.5) * 2.4;
+          }
+        }
+        mountainCount = 0; landTiles = [];
+        for (i = 0; i < W * H; i++) {
+          if (terrain[i] === T_MOUNT) mountainCount++;
+          if (terrain[i] !== T_WATER && terrain[i] !== T_MOUNT) landTiles.push(i);
+        }
+      }
+      function randomLand() {
+        var t = landTiles[Math.floor(Math.random() * landTiles.length)];
+        return { x: (t % W) + 0.5, y: Math.floor(t / W) + 0.5 };
+      }
+
+      /* ================= Estado ================= */
+      var tick = 0;
+      var beings = [], animals = [], foods = [], groups = [];
+      var nextGroupId = 0, nextBeingId = 0;
+      var FOOD_MIN = 85, FOOD_MAX = 150, POP_MAX = 750, ANIMAL_TARGET = 14;
+      var running = true, speed = 24;
+      var lastBirthLog = -99, lastLearnLog = -99;
+
+      var GROUP_COLORS = [];
+      function groupColor(id) {
+        if (!GROUP_COLORS[id]) {
+          var hue = (id * 47 + 15) % 360;
+          GROUP_COLORS[id] = "hsl(" + hue + ",65%,58%)";
+        }
+        return GROUP_COLORS[id];
+      }
+
+      function makeBeing(x, y, parentA, parentB) {
+        var b = {
+          id: nextBeingId++, x: x, y: y, age: 0, energy: 55 + Math.random() * 20,
+          speed: 1, vision: 4.5, group: -1,
+          learnPlant: false, learnWater: false, learnHunt: false,
+          heading: Math.random() * Math.PI * 2, reproCd: Math.floor(20 + Math.random() * 25),
+          drinkCd: 0, phase: Math.random() * 6
+        };
+        if (parentA && parentB) {
+          b.speed = clamp(((parentA.speed + parentB.speed) / 2) * (0.92 + Math.random() * 0.16), 0.5, 2.2);
+          b.vision = clamp(((parentA.vision + parentB.vision) / 2) * (0.92 + Math.random() * 0.16), 2.5, 8);
+          b.group = parentA.group;
+          b.learnPlant = (parentA.learnPlant || parentB.learnPlant) && Math.random() < 0.55;
+          b.learnWater = (parentA.learnWater || parentB.learnWater) && Math.random() < 0.55;
+          b.learnHunt = (parentA.learnHunt || parentB.learnHunt) && Math.random() < 0.55;
+          b.energy = 50;
+          b.age = 0;
+        } else {
+          b.speed = 0.8 + Math.random() * 0.6;
+          b.vision = 3.5 + Math.random() * 2.5;
+        }
+        return b;
+      }
+      function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+      function makeAnimal() {
+        var p = randomLand();
+        return { x: p.x, y: p.y, heading: Math.random() * Math.PI * 2, phase: Math.random() * 6 };
+      }
+      function spawnFood() {
+        var p = randomLand();
+        foods.push({ x: p.x + (Math.random() - 0.5) * 0.5, y: p.y + (Math.random() - 0.5) * 0.5, phase: Math.random() * 6 });
+      }
+
+      /* ================= Log ================= */
+      var logEl = document.getElementById("log");
+      var logItems = [];
+      function logEvent(msg) {
+        logItems.unshift({ t: tick, msg: msg });
+        if (logItems.length > 40) logItems.pop();
+        renderLog();
+      }
+      function renderLog() {
+        var html = "";
+        for (var i = 0; i < logItems.length; i++) {
+          html += '<li><span class="t">' + logItems[i].t + '</span>' + logItems[i].msg + '</li>';
+        }
+        logEl.innerHTML = html || '<li class="empty">Nada aconteceu ainda.</li>';
+      }
+
+      /* ================= Grupos ================= */
+      function createGroup(members) {
+        var g = { id: nextGroupId++, born: tick, stage: "grupo", cx: 0, cy: 0, members: [] };
+        for (var i = 0; i < members.length; i++) members[i].group = g.id;
+        groups.push(g);
+        return g;
+      }
+      function groupById(id) {
+        for (var i = 0; i < groups.length; i++) if (groups[i].id === id) return groups[i];
+        return null;
+      }
+      function refreshGroups() {
+        var i, b, g;
+        for (i = 0; i < groups.length; i++) { groups[i].members = []; }
+        for (i = 0; i < beings.length; i++) {
+          b = beings[i];
+          if (b.group >= 0) {
+            g = groupById(b.group);
+            if (g) g.members.push(b); else b.group = -1;
+          }
+        }
+        // remove grupos vazios
+        groups = groups.filter(function (gr) { return gr.members.length > 0; });
+        for (i = 0; i < groups.length; i++) {
+          g = groups[i];
+          var sx = 0, sy = 0;
+          for (var j = 0; j < g.members.length; j++) { sx += g.members[j].x; sy += g.members[j].y; }
+          g.cx = sx / g.members.length; g.cy = sy / g.members.length;
+          var age = tick - g.born, n = g.members.length, stage = "grupo";
+          if (age > 300 && n >= 20) stage = "civilizacao";
+          else if (age > 150 && n >= 5) stage = "aldeia";
+          if (stage !== g.stage) {
+            if (stage === "aldeia") logEvent("G" + g.id + " virou Aldeia com " + n + " membros.");
+            if (stage === "civilizacao") logEvent("G" + g.id + " virou Civilização com " + n + " membros.");
+            g.stage = stage;
+          }
+        }
+      }
+      function tryFormGroups() {
+        var lone = beings.filter(function (b) { return b.group < 0; });
+        var used = {};
+        for (var i = 0; i < lone.length; i++) {
+          var a = lone[i];
+          if (used[a.id]) continue;
+          var cluster = [a];
+          for (var j = 0; j < lone.length; j++) {
+            if (i === j || used[lone[j].id]) continue;
+            var dx = lone[j].x - a.x, dy = lone[j].y - a.y;
+            if (dx * dx + dy * dy < 30) cluster.push(lone[j]);
+          }
+          if (cluster.length >= 4) {
+            for (var k = 0; k < cluster.length; k++) used[cluster[k].id] = true;
+            var g = createGroup(cluster);
+            logEvent("Um novo grupo se formou: G" + g.id + " com " + cluster.length + " seres.");
+          }
+        }
+      }
+      function trySplitGroups() {
+        var snapshot = groups.slice();
+        for (var i = 0; i < snapshot.length; i++) {
+          var g = snapshot[i];
+          if (g.members.length > 40) {
+            var sorted = g.members.slice().sort(function (p, q) { return p.x - q.x; });
+            var half = sorted.slice(Math.floor(sorted.length / 2));
+            var ng = createGroup(half);
+            logEvent("G" + g.id + " cresceu demais e se dividiu: nasceu G" + ng.id + ".");
+          }
+        }
+      }
+
+      /* ================= Simulação ================= */
+      function stepSim() {
+        tick++;
+        var i, j, b;
+
+        // comida renasce todo tick, com mínimo garantido
+        while (foods.length < FOOD_MIN) spawnFood();
+        if (foods.length < FOOD_MAX && Math.random() < 0.6) spawnFood();
+
+        // animais renascem
+        while (animals.length < ANIMAL_TARGET) animals.push(makeAnimal());
+        for (i = 0; i < animals.length; i++) {
+          var an = animals[i];
+          if (Math.random() < 0.06) an.heading = Math.random() * Math.PI * 2;
+          var ax = an.x + Math.cos(an.heading) * 0.05, ay = an.y + Math.sin(an.heading) * 0.05;
+          var tt = tileAt(ax, ay);
+          if (tt !== T_WATER && tt !== T_MOUNT) { an.x = ax; an.y = ay; }
+          else an.heading += Math.PI * 0.7;
+          an.phase += 0.3;
+        }
+
+        refreshGroups();
+
+        // --- seres ---
+        var newborns = [];
+        for (i = 0; i < beings.length; i++) {
+          b = beings[i];
+          b.age++;
+          b.energy -= 0.22;
+          if (b.reproCd > 0) b.reproCd--;
+          if (b.drinkCd > 0) b.drinkCd--;
+
+          // aprende a achar água ao ficar perto dela
+          if (!b.learnWater && b.drinkCd === 0) {
+            var nearWater = tileAt(b.x + 1, b.y) === T_WATER || tileAt(b.x - 1, b.y) === T_WATER ||
+                            tileAt(b.x, b.y + 1) === T_WATER || tileAt(b.x, b.y - 1) === T_WATER;
+            if (nearWater) {
+              b.learnWater = true;
+              b.energy = Math.min(100, b.energy + 9);
+              b.drinkCd = 45;
+              if (tick - lastLearnLog > 20) { lastLearnLog = tick; logEvent("Um ser aprendeu a achar água."); }
+            }
+          }
+
+          // alvo: comida mais próxima dentro da visão
+          var target = null, bestD = 1e9;
+          if (b.energy < 78) {
+            var seekR = b.energy < 35 ? b.vision * 2.6 : b.vision; // faminto, procura bem mais longe
+            for (j = 0; j < foods.length; j++) {
+              var f = foods[j], fdx = f.x - b.x, fdy = f.y - b.y, fd = fdx * fdx + fdy * fdy;
+              if (fd < bestD && fd < seekR * seekR) { bestD = fd; target = f; }
+            }
+          }
+          // alvo: animal, se já sabe caçar ou está experimentando
+          var prey = null;
+          if (!target && b.energy < 60 && (b.learnHunt || Math.random() < 0.25)) {
+            var pd = 1e9;
+            for (j = 0; j < animals.length; j++) {
+              var pa = animals[j], pdx = pa.x - b.x, pdy = pa.y - b.y, dd = pdx * pdx + pdy * pdy;
+              if (dd < pd && dd < b.vision * b.vision) { pd = dd; prey = pa; }
+            }
+          }
+
+          var mvx = 0, mvy = 0, sp = 0.085 * b.speed;
+          if (target) { mvx = target.x - b.x; mvy = target.y - b.y; }
+          else if (prey) { mvx = prey.x - b.x; mvy = prey.y - b.y; }
+          else {
+            // coesão com o grupo + passeio aleatório
+            var g = b.group >= 0 ? groupById(b.group) : null;
+            if (g && g.members.length > 1) {
+              var gdx = g.cx - b.x, gdy = g.cy - b.y, gd = Math.sqrt(gdx * gdx + gdy * gdy);
+              if (gd > 5) { mvx = gdx; mvy = gdy; }
+            }
+            if (mvx === 0 && mvy === 0 && b.group < 0) {
+              // sem grupo: tende a se aproximar de outros seres
+              var nd = 1e9, nb2 = null;
+              for (var q = 0; q < beings.length; q++) {
+                if (beings[q] === b) continue;
+                var qdx = beings[q].x - b.x, qdy = beings[q].y - b.y, qd = qdx * qdx + qdy * qdy;
+                if (qd < nd) { nd = qd; nb2 = beings[q]; }
+              }
+              if (nb2 && nd > 5) { mvx = nb2.x - b.x; mvy = nb2.y - b.y; }
+            }
+            if (mvx === 0 && mvy === 0) {
+              if (Math.random() < 0.05) b.heading = Math.random() * Math.PI * 2;
+              mvx = Math.cos(b.heading); mvy = Math.sin(b.heading); sp *= 0.55;
+            }
+          }
+          var ml = Math.sqrt(mvx * mvx + mvy * mvy);
+          if (ml > 0.001) {
+            var nx = b.x + (mvx / ml) * sp, ny = b.y + (mvy / ml) * sp;
+            var nt = tileAt(nx, ny);
+            if (nt !== T_WATER && nt !== T_MOUNT) { b.x = nx; b.y = ny; b.phase += 0.55 * b.speed; }
+            else b.heading += Math.PI * 0.6 + Math.random() * 0.5;
+          }
+
+          // comer planta
+          for (j = foods.length - 1; j >= 0; j--) {
+            var fo = foods[j], edx = fo.x - b.x, edy = fo.y - b.y;
+            if (edx * edx + edy * edy < 0.42) {
+              foods.splice(j, 1);
+              b.energy = Math.min(100, b.energy + 36);
+              if (!b.learnPlant) {
+                b.learnPlant = true;
+                if (tick - lastLearnLog > 20) { lastLearnLog = tick; logEvent("Um ser aprendeu a colher plantas."); }
+              }
+              break;
+            }
+          }
+          // caçar animal
+          if (prey) {
+            var hdx = prey.x - b.x, hdy = prey.y - b.y;
+            if (hdx * hdx + hdy * hdy < 0.55 && Math.random() < 0.3) {
+              animals.splice(animals.indexOf(prey), 1);
+              b.energy = Math.min(100, b.energy + 46);
+              if (!b.learnHunt) {
+                b.learnHunt = true;
+                if (tick - lastLearnLog > 20) { lastLearnLog = tick; logEvent("Um ser aprendeu a caçar animais."); }
+              }
+            }
+          }
+
+          // reprodução com herança de traços
+          if (b.energy > 66 && b.age > 25 && b.reproCd === 0 && beings.length + newborns.length < POP_MAX) {
+            for (j = 0; j < beings.length; j++) {
+              if (j === i) continue;
+              var o = beings[j];
+              if (o.energy < 52 || o.age < 25) continue;
+              var rdx = o.x - b.x, rdy = o.y - b.y;
+              if (rdx * rdx + rdy * rdy < 5.3) {
+                b.energy -= 18; o.energy -= 18;
+                b.reproCd = 28; o.reproCd = 28;
+                var child = makeBeing(b.x + (Math.random() - 0.5), b.y + (Math.random() - 0.5), b, o);
+                if (child.group < 0 && o.group >= 0) child.group = o.group;
+                newborns.push(child);
+                if (tick - lastBirthLog > 12) { lastBirthLog = tick; logEvent("Nasceu um novo ser."); }
+                break;
+              }
+            }
+          }
+        }
+        for (i = 0; i < newborns.length; i++) beings.push(newborns[i]);
+
+        // mortes
+        beings = beings.filter(function (bb) { return bb.energy > 0 && bb.age < 950; });
+        // segurança: nunca zera a população
+        if (beings.length < 12) {
+          var p = randomLand();
+          beings.push(makeBeing(p.x, p.y, null, null));
+        }
+
+        if (tick % 8 === 0) tryFormGroups();
+        if (tick % 20 === 0) { refreshGroups(); trySplitGroups(); }
+      }
+
+      /* ================= Desenho ================= */
+      var canvas = document.getElementById("map");
+      var ctx = canvas.getContext("2d");
+      var terrainCanvas = document.createElement("canvas");
+
+      function buildTerrainImage() {
+        var S = 18;
+        terrainCanvas.width = W * S; terrainCanvas.height = H * S;
+        var c = terrainCanvas.getContext("2d");
+        var colors = {};
+        colors[T_WATER] = "#2f6db3"; colors[T_GRASS] = "#5da24a"; colors[T_SAND] = "#e3c878";
+        colors[T_FOREST] = "#2e5d2a"; colors[T_EARTH] = "#8a6a48"; colors[T_MOUNT] = "#7c7c84";
+        for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
+          var t = terrain[idx(x, y)], h = hash2(x, y), px = x * S, py = y * S;
+          c.fillStyle = colors[t];
+          c.fillRect(px, py, S, S);
+          // variação de tom
+          c.fillStyle = h > 0.5 ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.07)";
+          c.fillRect(px, py, S, S);
+          if (t === T_WATER) {
+            c.strokeStyle = "rgba(255,255,255,0.20)"; c.lineWidth = 1.4;
+            c.beginPath(); c.moveTo(px + 3 + h * 4, py + S * 0.55); c.lineTo(px + S - 4, py + S * 0.55); c.stroke();
+          } else if (t === T_FOREST) {
+            // árvore: copa + tronco
+            c.fillStyle = "#6d4c2f"; c.fillRect(px + S / 2 - 1.2, py + S * 0.58, 2.4, S * 0.3);
+            c.fillStyle = h > 0.5 ? "#3f7d33" : "#38702d";
+            c.beginPath(); c.arc(px + S / 2, py + S * 0.4, S * 0.3, 0, Math.PI * 2); c.fill();
+            c.fillStyle = "rgba(255,255,255,0.10)";
+            c.beginPath(); c.arc(px + S / 2 - 2, py + S * 0.32, S * 0.11, 0, Math.PI * 2); c.fill();
+          } else if (t === T_MOUNT) {
+            c.fillStyle = "#8d8d94";
+            c.beginPath(); c.moveTo(px + 1, py + S - 1); c.lineTo(px + S / 2, py + 1); c.lineTo(px + S - 1, py + S - 1); c.closePath(); c.fill();
+            c.fillStyle = "#f4f6f8";
+            c.beginPath(); c.moveTo(px + S / 2 - 3.4, py + 4.6); c.lineTo(px + S / 2, py + 1); c.lineTo(px + S / 2 + 3.4, py + 4.6);
+            c.lineTo(px + S / 2 + 1.2, py + 3.4); c.lineTo(px + S / 2, py + 5); c.lineTo(px + S / 2 - 1.4, py + 3.6); c.closePath(); c.fill();
+          } else if (t === T_GRASS) {
+            c.strokeStyle = "rgba(30,80,25,0.35)"; c.lineWidth = 1;
+            c.beginPath();
+            c.moveTo(px + 4 + h * 6, py + S - 4); c.lineTo(px + 4 + h * 6, py + S - 8);
+            c.moveTo(px + S - 5 - h * 3, py + S - 5); c.lineTo(px + S - 5 - h * 3, py + S - 9);
+            c.stroke();
+          } else if (t === T_EARTH) {
+            c.fillStyle = "rgba(0,0,0,0.13)";
+            c.beginPath(); c.arc(px + 4 + h * 8, py + 5 + h * 7, 1.6, 0, Math.PI * 2); c.fill();
+          }
+        }
+      }
+
+      function drawHouse(c, px, py, s, wall, roof) {
+        c.fillStyle = wall;
+        c.fillRect(px - s * 0.42, py - s * 0.34, s * 0.84, s * 0.66);
+        c.fillStyle = roof;
+        c.beginPath();
+        c.moveTo(px - s * 0.55, py - s * 0.32); c.lineTo(px, py - s * 0.78); c.lineTo(px + s * 0.55, py - s * 0.32);
+        c.closePath(); c.fill();
+        c.fillStyle = "#5b4126";
+        c.fillRect(px - s * 0.11, py - s * 0.02, s * 0.22, s * 0.34); // porta
+        c.fillStyle = "rgba(90,60,30,0.85)";
+        c.fillRect(px - s * 0.42, py - s * 0.36, s * 0.84, s * 0.09); // viga
+      }
+
+      function draw() {
+        var cw = canvas.width, ch = canvas.height;
+        var tile = cw / W;
+        ctx.drawImage(terrainCanvas, 0, 0, cw, ch);
+        var i, x, y;
+
+        // aldeias e civilizações (casas no centro do grupo)
+        for (i = 0; i < groups.length; i++) {
+          var g = groups[i];
+          if (g.stage === "grupo") continue;
+          var gx = g.cx * tile, gy = g.cy * tile, col = groupColor(g.id);
+          if (g.stage === "aldeia") {
+            drawHouse(ctx, gx - tile * 0.7, gy, tile * 1.15, "#e8dcc0", "#a4552f");
+            drawHouse(ctx, gx + tile * 0.7, gy + tile * 0.25, tile * 1.0, "#ded0ae", "#8f4526");
+          } else {
+            // praça central com bandeira
+            ctx.fillStyle = "#cbb98a";
+            ctx.fillRect(gx - tile * 0.55, gy - tile * 0.55, tile * 1.1, tile * 1.1);
+            ctx.strokeStyle = "#8a7648"; ctx.lineWidth = Math.max(1, tile * 0.05);
+            ctx.strokeRect(gx - tile * 0.55, gy - tile * 0.55, tile * 1.1, tile * 1.1);
+            drawHouse(ctx, gx - tile * 1.25, gy - tile * 0.7, tile * 1.1, "#e8dcc0", "#a4552f");
+            drawHouse(ctx, gx + tile * 1.25, gy - tile * 0.6, tile * 1.1, "#ded0ae", "#8f4526");
+            drawHouse(ctx, gx - tile * 1.15, gy + tile * 0.95, tile * 1.0, "#e8dcc0", "#9c4c2a");
+            drawHouse(ctx, gx + tile * 1.2, gy + tile * 0.95, tile * 1.0, "#d8c69c", "#a4552f");
+            drawHouse(ctx, gx, gy + tile * 1.5, tile * 0.95, "#e8dcc0", "#8f4526");
+            // mastro e bandeira da cor do grupo
+            ctx.strokeStyle = "#4c3a22"; ctx.lineWidth = Math.max(1.2, tile * 0.07);
+            ctx.beginPath(); ctx.moveTo(gx, gy + tile * 0.4); ctx.lineTo(gx, gy - tile * 0.95); ctx.stroke();
+            ctx.fillStyle = col;
+            ctx.beginPath();
+            ctx.moveTo(gx, gy - tile * 0.95); ctx.lineTo(gx + tile * 0.62, gy - tile * 0.74); ctx.lineTo(gx, gy - tile * 0.53);
+            ctx.closePath(); ctx.fill();
+          }
+        }
+
+        // comida: brilhos dourados
+        for (i = 0; i < foods.length; i++) {
+          var f = foods[i];
+          x = f.x * tile; y = f.y * tile;
+          var r = tile * (0.16 + 0.05 * Math.sin(tick * 0.35 + f.phase));
+          ctx.fillStyle = "rgba(242,193,78,0.30)";
+          ctx.beginPath(); ctx.arc(x, y, r * 2.1, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#ffd94d";
+          ctx.beginPath();
+          ctx.moveTo(x, y - r * 1.5); ctx.lineTo(x + r * 0.42, y - r * 0.42); ctx.lineTo(x + r * 1.5, y);
+          ctx.lineTo(x + r * 0.42, y + r * 0.42); ctx.lineTo(x, y + r * 1.5); ctx.lineTo(x - r * 0.42, y + r * 0.42);
+          ctx.lineTo(x - r * 1.5, y); ctx.lineTo(x - r * 0.42, y - r * 0.42);
+          ctx.closePath(); ctx.fill();
+        }
+
+        // animais: maiores que os seres
+        for (i = 0; i < animals.length; i++) {
+          var an = animals[i];
+          x = an.x * tile; y = an.y * tile;
+          var s = tile, flip = Math.cos(an.heading) < 0 ? -1 : 1, lp = Math.sin(an.phase) * s * 0.08;
+          ctx.fillStyle = "rgba(0,0,0,0.25)";
+          ctx.beginPath(); ctx.ellipse(x, y + s * 0.34, s * 0.52, s * 0.13, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#5d4a33"; ctx.lineWidth = Math.max(1.2, s * 0.09);
+          ctx.beginPath();
+          ctx.moveTo(x - s * 0.3, y + s * 0.12); ctx.lineTo(x - s * 0.3, y + s * 0.34 + lp);
+          ctx.moveTo(x + s * 0.3, y + s * 0.12); ctx.lineTo(x + s * 0.3, y + s * 0.34 - lp);
+          ctx.stroke();
+          ctx.fillStyle = "#9a7d55";
+          ctx.beginPath(); ctx.ellipse(x, y, s * 0.52, s * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#8a6d49";
+          ctx.beginPath(); ctx.arc(x + flip * s * 0.52, y - s * 0.12, s * 0.21, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#3a2d1d";
+          ctx.beginPath(); ctx.arc(x + flip * s * 0.6, y - s * 0.14, s * 0.045, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // seres: bonequinhos de palito com sombra
+        for (i = 0; i < beings.length; i++) {
+          var b = beings[i];
+          x = b.x * tile; y = b.y * tile;
+          var col2 = b.group >= 0 ? groupColor(b.group) : "#a678e8";
+          var s2 = tile, swing = Math.sin(b.phase) * s2 * 0.16;
+          ctx.fillStyle = "rgba(0,0,0,0.28)";
+          ctx.beginPath(); ctx.ellipse(x, y + s2 * 0.42, s2 * 0.26, s2 * 0.09, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = col2; ctx.lineWidth = Math.max(1.3, s2 * 0.11); ctx.lineCap = "round";
+          ctx.beginPath();
+          // pernas
+          ctx.moveTo(x, y + s2 * 0.08); ctx.lineTo(x - s2 * 0.16 + swing, y + s2 * 0.42);
+          ctx.moveTo(x, y + s2 * 0.08); ctx.lineTo(x + s2 * 0.16 - swing, y + s2 * 0.42);
+          // corpo
+          ctx.moveTo(x, y - s2 * 0.22); ctx.lineTo(x, y + s2 * 0.08);
+          // braços
+          ctx.moveTo(x, y - s2 * 0.14); ctx.lineTo(x - s2 * 0.24, y + s2 * 0.02 - swing * 0.6);
+          ctx.moveTo(x, y - s2 * 0.14); ctx.lineTo(x + s2 * 0.24, y + s2 * 0.02 + swing * 0.6);
+          ctx.stroke();
+          // cabeça
+          ctx.fillStyle = "#f2cd9b";
+          ctx.beginPath(); ctx.arc(x, y - s2 * 0.36, s2 * 0.17, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "rgba(90,60,30,0.6)"; ctx.lineWidth = Math.max(0.7, s2 * 0.04);
+          ctx.stroke();
+        }
+      }
+
+      function fitCanvas() {
+        var wpx = canvas.clientWidth || canvas.parentElement.clientWidth || 960;
+        var dpr = Math.min(2, window.devicePixelRatio || 1);
+        canvas.width = Math.round(wpx * dpr);
+        canvas.height = Math.round(wpx * (H / W) * dpr);
+        draw();
+      }
+
+      /* ================= Painéis ================= */
+      var el = function (id) { return document.getElementById(id); };
+      var fmt = function (n) { return n.toLocaleString("pt-BR"); };
+      function renderStats() {
+        el("tickCount").textContent = fmt(tick);
+        var lone = 0, pl = 0, wa = 0, hu = 0, ss = 0, vv = 0, i;
+        for (i = 0; i < beings.length; i++) {
+          var b = beings[i];
+          if (b.group < 0) lone++;
+          if (b.learnPlant) pl++;
+          if (b.learnWater) wa++;
+          if (b.learnHunt) hu++;
+          ss += b.speed; vv += b.vision;
+        }
+        var vil = 0, civ = 0;
+        for (i = 0; i < groups.length; i++) {
+          if (groups[i].stage === "aldeia") vil++;
+          else if (groups[i].stage === "civilizacao") civ++;
+        }
+        el("stTotal").textContent = fmt(beings.length);
+        el("stLone").textContent = fmt(lone);
+        el("stGroups").textContent = fmt(groups.length);
+        el("stVillages").textContent = fmt(vil);
+        el("stCivs").textContent = fmt(civ);
+        el("stAnimals").textContent = fmt(animals.length);
+        el("stFood").textContent = fmt(foods.length);
+        el("stMountains").textContent = fmt(mountainCount);
+        el("lnPlant").textContent = fmt(pl);
+        el("lnWater").textContent = fmt(wa);
+        el("lnHunt").textContent = fmt(hu);
+        var n = Math.max(1, beings.length);
+        el("lnSpeed").textContent = (ss / n).toFixed(2).replace(".", ",");
+        el("lnVision").textContent = (vv / n).toFixed(2).replace(".", ",");
+
+        // legenda: só os 5 maiores grupos
+        var top = groups.slice().sort(function (a, b2) { return b2.members.length - a.members.length; }).slice(0, 5);
+        var html = "";
+        if (top.length) {
+          html = '<div class="tg-title">Maiores grupos</div>';
+          for (i = 0; i < top.length; i++) {
+            var g = top[i];
+            var stage = g.stage === "civilizacao" ? "Civilização" : (g.stage === "aldeia" ? "Aldeia" : "Grupo");
+            html += '<div class="row"><i class="sw round" style="background:' + groupColor(g.id) + '"></i>G' + g.id +
+                    " — " + g.members.length + " seres · " + stage + "</div>";
+          }
+        }
+        el("topGroups").innerHTML = html;
+      }
+
+      /* ================= Loop e controles ================= */
+      var lastTime = 0, acc = 0, statTimer = 0;
+      function frame(ts) {
+        requestAnimationFrame(frame);
+        if (!lastTime) lastTime = ts;
+        var dt = Math.min(250, ts - lastTime);
+        lastTime = ts;
+        if (running) {
+          acc += (dt / 1000) * speed;
+          var steps = Math.floor(acc);
+          if (steps > 0) {
+            acc -= steps;
+            if (steps > 12) steps = 12;
+            for (var i = 0; i < steps; i++) stepSim();
+            draw();
+          }
+        }
+        statTimer += dt;
+        if (statTimer > 200) { statTimer = 0; renderStats(); }
+      }
+
+      el("btnStart").addEventListener("click", function () { running = true; });
+      el("btnPause").addEventListener("click", function () { running = false; });
+      var speedInput = el("speed"), speedVal = el("speedVal");
+      speedInput.addEventListener("input", function () {
+        speed = parseInt(speedInput.value, 10) || 1;
+        speedVal.textContent = speed + " t/s";
+      });
+
+      /* ================= Início ================= */
+      genWorld();
+      buildTerrainImage();
+      var si;
+      // os primeiros seres surgem em pequenos bandos, como bandos nômades
+      for (var band = 0; band < 5; band++) {
+        var center = randomLand();
+        for (si = 0; si < 7; si++) {
+          var bx = center.x + (Math.random() - 0.5) * 4, by = center.y + (Math.random() - 0.5) * 4;
+          var bt = tileAt(bx, by);
+          if (bt === T_WATER || bt === T_MOUNT) { bx = center.x; by = center.y; }
+          beings.push(makeBeing(bx, by, null, null));
+        }
+      }
+      for (si = 0; si < ANIMAL_TARGET; si++) animals.push(makeAnimal());
+      for (si = 0; si < FOOD_MIN + 20; si++) spawnFood();
+      logEvent("A simulação começou com 35 seres em um mundo novo.");
+      renderLog();
+      renderStats();
+      fitCanvas();
+      window.addEventListener("resize", fitCanvas);
+      requestAnimationFrame(frame);
+
+      // acesso para verificação externa (testes no navegador)
+      window.__sim = {
+        step: function (n) { for (var i = 0; i < n; i++) stepSim(); refreshGroups(); draw(); renderStats(); },
+        stats: function () {
+          var vil = 0, civ = 0;
+          for (var i = 0; i < groups.length; i++) {
+            if (groups[i].stage === "aldeia") vil++;
+            else if (groups[i].stage === "civilizacao") civ++;
+          }
+          return { tick: tick, beings: beings.length, groups: groups.length, villages: vil, civs: civ, food: foods.length, animals: animals.length, mountains: mountainCount };
+        }
+      };
+    })();
+    </script>
+  </body>
+</html>
